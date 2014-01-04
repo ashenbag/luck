@@ -17,19 +17,20 @@ sub hashvalues_to_array;
 sub pkg_mean (@);
 
 #Command line check
-if(@ARGV != 11) {
+if(@ARGV != 13) {
 	print "\n";
 	print "Invalid arguments\n";
-	print "Format: perl mm.pl count <count> start_date <start_date> find_value <0/1 find_value>\n";
+	print "Format: perl luck.pl mm/pp <1/2> count <count> start_date <start_date> find_value <0/1 find_value>\n";
 	print "\n";
 	exit(0);
 }
 
 #Read command line
-my($freq_count) = $ARGV[1];
-my($start_date) = $ARGV[3];
-my($isfind) = $ARGV[5];
-my($find_value) = sprintf "%2d %2d %2d %2d %2d ", $ARGV[6],$ARGV[7],$ARGV[8],$ARGV[9],$ARGV[10];
+my($mm_pp) = $ARGV[1];
+my($freq_count) = $ARGV[3];
+my($start_date) = $ARGV[5];
+my($isfind) = $ARGV[7];
+my($find_value) = sprintf "%2d %2d %2d %2d %2d ", $ARGV[8],$ARGV[9],$ARGV[10],$ARGV[11],$ARGV[12];
 
 #Setting large value to include all values from data
 if($freq_count == -1) {
@@ -38,8 +39,8 @@ if($freq_count == -1) {
 
 #Global variables
 #Master hash table
-my(%hash_table_mm_sorted) = ();
-my(%hash_table_mm_unsorted) = ();
+my(%hash_table_sorted) = ();
+my(%hash_table_unsorted) = ();
 my(%hash_values_dates) = ();
 my(@calc_array);
 
@@ -68,14 +69,14 @@ if (0) {
 	match_print_dates;
 }
 
-if (0) {
+if (1) {
 	fill_hash_values_dates;
 	
 	#List date differences
 	match_print_date_diffs;
 }
 
-if (1) {
+if (0) {
 	@calc_array = hashvalues_to_array;
 	pkg_mean (@calc_array);
 }
@@ -92,6 +93,7 @@ exit(0);
 
 #Read the data file and fill the hash table
 sub read_file_fill_hash {
+	my($infile);
 	my(@x);
 	my(@temp_array1);
 	my($temp_value1);
@@ -102,7 +104,11 @@ sub read_file_fill_hash {
 	my($count) = 1;
 
 	#Input data file
-	my($infile) = "data";
+	if ($mm_pp == 1) {
+		$infile = "data_mm";
+	} elsif ($mm_pp == 2) {
+		$infile = "data_pb";
+	}
 	open(DATA,"$infile" ) || die "could't open $infile$!";
 
 	while(<DATA>)
@@ -134,13 +140,13 @@ sub read_file_fill_hash {
         	@temp_array1 = sort {$a <=> $b} @temp_array1;
         	$hash_value = sprintf "%2d %2d %2d %2d %2d ", $temp_array1[0], $temp_array1[1], $temp_array1[2], $temp_array1[3], $temp_array1[4];
 		#Building the hash table with date as key and sorted numbers as value.
-        	$hash_table_mm_sorted{"$hash_key"} = $hash_value;
+        	$hash_table_sorted{"$hash_key"} = $hash_value;
 
 		#Storing it as 2 digit numeric values - unsorted
         	@temp_array1 = ($x[1], $x[2], $x[3], $x[4], $x[5]);
         	$hash_value = sprintf "%2d %2d %2d %2d %2d ", $temp_array1[0], $temp_array1[1], $temp_array1[2], $temp_array1[3], $temp_array1[4];
 		#Building the hash table with date as key and unsorted numbers as value.
-        	$hash_table_mm_unsorted{"$hash_key"} = $hash_value;
+        	$hash_table_unsorted{"$hash_key"} = $hash_value;
 		
 		$count++;
 	}
@@ -151,7 +157,7 @@ sub find_match {
 	my($hash_key) = 0;
 	my($hash_value) = 0;
 	my($found_flag) = 0;
-	while (($hash_key, $hash_value) = each(%hash_table_mm_sorted)) {
+	while (($hash_key, $hash_value) = each(%hash_table_sorted)) {
 		if(($find_value eq $hash_value)) {
 			print "Value found: $hash_value Date: $hash_key\n";
 			$found_flag = 1;
@@ -171,7 +177,7 @@ sub frequency_analysis {
 	my($temp_value1) = 0;
 	my(@temp_array1);
 
-	while (($key, $value) = each(%hash_table_mm_sorted)) {
+	while (($key, $value) = each(%hash_table_sorted)) {
 		@temp_array1 = split(' ',$value);
 		foreach $temp_value1 (@temp_array1) {
 			%hash_range_freq = range_frequency ($temp_value1, %hash_range_freq);
@@ -283,8 +289,8 @@ sub fill_hash_values_dates {
 
 	$i=0;
 	for($plen=(3*2);$plen<=(3*5);$plen+=3) {
-		%temp_hash = %hash_table_mm_sorted;
-		while (($keyi, $valuei) = each(%hash_table_mm_sorted)) {
+		%temp_hash = %hash_table_sorted;
+		while (($keyi, $valuei) = each(%hash_table_sorted)) {
 			for ($k1=0;$k1<=((3*5)-$plen);$k1+=3) {
 				$substri = substr $valuei, $k1, $plen;
 				while (($keyj, $valuej) = each(%temp_hash)) {
@@ -372,7 +378,7 @@ sub match_print_date_diffs {
 sub hashvalues_to_array {
 	my($keyi) = 0;
 	my($valuei) = 0;
-	my(%hash_table) = %hash_table_mm_sorted;
+	my(%hash_table) = %hash_table_sorted;
 	my(@calc_array);
 	my(@temp_array);
 	
