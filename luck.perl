@@ -15,12 +15,13 @@ sub match_print_dates;
 sub match_print_date_diffs;
 sub hashvalues_to_array;
 sub pkg_mean (@);
+sub next_value_analysis;
 
 #Command line check
-if(@ARGV != 13) {
+if(@ARGV != 15) {
 	print "\n";
 	print "Invalid arguments\n";
-	print "Format: perl luck.pl mm/pp <1/2> count <count> start_date <start_date> find_value <0/1 find_value>\n";
+	print "Format: perl luck.pl mm/pp <1/2> count <count> start_date <start_date> find_value <0/1 find_value> next_value <value>\n";
 	print "\n";
 	exit(0);
 }
@@ -31,6 +32,7 @@ my($freq_count) = $ARGV[3];
 my($start_date) = $ARGV[5];
 my($isfind) = $ARGV[7];
 my($find_value) = sprintf "%2d %2d %2d %2d %2d ", $ARGV[8],$ARGV[9],$ARGV[10],$ARGV[11],$ARGV[12];
+my($current_value) = $ARGV[14];
 
 #Setting large value to include all values from data
 if($freq_count == -1) {
@@ -69,7 +71,7 @@ if (0) {
 	match_print_dates;
 }
 
-if (1) {
+if (0) {
 	fill_hash_values_dates;
 	
 	#List date differences
@@ -79,6 +81,11 @@ if (1) {
 if (0) {
 	@calc_array = hashvalues_to_array;
 	pkg_mean (@calc_array);
+}
+
+if(1) {
+	print "Given: $current_value\n";
+	next_value_analysis;
 }
 
 #Closing data file and exiting the program.
@@ -123,6 +130,7 @@ sub read_file_fill_hash {
 		$temp_array1[1] = $temp_value1;
 		$temp_array1[2] = $temp_value2;
 	        $hash_key = join('/',@temp_array1);
+	        #$hash_key = $x[0];
 
 		if (($hash_key gt $start_date) && ($flag == 0)) {
 			#Without filling hash table, moving on to find the desired date
@@ -189,7 +197,7 @@ sub frequency_analysis {
 	print "Date   : $start_date\n";
 	print "Period : $freq_count\n";
 	foreach $key (sort {$a cmp $b} keys %hash_range_freq) {
-		print "$key : $hash_range_freq{$key}\n";
+	#	print "$key : $hash_range_freq{$key}\n";
 	}
 	print "\n";
 	foreach $key (sort {$a <=> $b} keys %hash_indiv_freq) {
@@ -397,5 +405,35 @@ sub pkg_mean (@) {
 	my($mean) = $stat->mean();
 	my($count) = $stat->count();
 	print "Count: $count Mean: $mean\n";
+}
+
+#Next value analysis
+sub next_value_analysis {
+	my($key);
+	my($value);
+	my(%hash_indiv_freq) = ();
+	my(@temp_array1);
+	my($i) = 0;
+
+        while (($key, $value) = each(%hash_table_unsorted)) {
+                @temp_array1 = split(' ',$value);
+		for ($i = 0; $i < @temp_array1; $i++) {
+			if($temp_array1[$i] == $current_value) {
+				if ($i < 4) {	
+                        		%hash_indiv_freq = indiv_frequency ($temp_array1[$i+1], %hash_indiv_freq);
+				} elsif ($i == 4) {
+                        		%hash_indiv_freq = indiv_frequency (0,%hash_indiv_freq);
+				}
+			}
+                }
+        }
+	if(%hash_indiv_freq) {
+		print "Next : Frequency\n";
+        	foreach $key (reverse sort {$hash_indiv_freq{$a} <=> $hash_indiv_freq{$b}} keys %hash_indiv_freq) {
+			print "$key   : $hash_indiv_freq{$key}\n";
+		}
+        } else {
+		print "No matching value.\n";
+	}
 }
 ################End Sub-routines#########################
