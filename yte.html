@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>YouTube Local Embed</title>
+<style>
+  :root { --player-width: 90vw; }  /* change this if you want */
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: #0f1115;
+    color: #e7e9ee;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+  .page {
+    min-height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 16px;
+    place-items: center;
+    padding: 20px 12px 28px;
+  }
+  .controls {
+    width: min(900px, 96vw);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .controls input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #2a2f3a;
+    background: #0e1218;
+    color: #e7e9ee;
+    outline: none;
+  }
+  .controls button, .controls select {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #2a2f3a;
+    background: #171b23;
+    color: #e7e9ee;
+    cursor: pointer;
+  }
+  .controls button:hover { background: #1d2430; }
+
+  /* Responsive 16:9 wrapper at ~90% of viewport size */
+  .frame-wrap {
+    width: min(var(--player-width), 1600px);
+    aspect-ratio: 16 / 9;              /* modern browsers (incl. Firefox) */
+    background: #0b0d12;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgba(0,0,0,.45);
+  }
+  .frame-wrap iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+
+  .hint { opacity: .7; font-size: .9rem; }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="controls">
+      <input id="ytInput" type="text" placeholder="Paste YouTube URL or video ID, then press Enter…" />
+      <button id="loadBtn" title="Load in player">Load</button>
+      <div class="hint" style="grid-column: 1 / -1">
+        Size: 
+        <select id="sizeSel">
+          <option value="70vw">70%</option>
+          <option value="80vw">80%</option>
+          <option value="90vw" selected>90%</option>
+          <option value="95vw">95%</option>
+          <option value="100vw">100%</option>
+        </select>
+        &nbsp;•&nbsp; Autoplay
+        <input type="checkbox" id="autoplay" checked />
+        &nbsp;•&nbsp; <button id="openTab">Open direct /embed in new tab</button>
+      </div>
+    </div>
+
+    <div class="frame-wrap" id="wrap">
+      <iframe id="player"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+        referrerpolicy="strict-origin-when-cross-origin">
+      </iframe>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const $ = sel => document.querySelector(sel);
+  const input = $('#ytInput');
+  const player = $('#player');
+  const sizeSel = $('#sizeSel');
+  const wrap = $('#wrap');
+  const autoplay = $('#autoplay');
+  const openTab = $('#openTab');
+
+  // Extract ID from various YouTube URL shapes
+  function extractId(u){
+    if(!u) return null;
+    try {
+      // if plain ID (11 chars typical), accept it
+      if (/^[a-zA-Z0-9_-]{10,}$/.test(u)) return u;
+
+      // normalize if it's a URL
+      const s = String(u);
+      let m;
+      if ((m = s.match(/[?&]v=([^&]+)/))) return m[1];
+      if ((m = s.match(/youtu\.be\/([^?&#/]+)/))) return m[1];
+      if ((m = s.match(/\/shorts\/([^?&#/]+)/))) return m[1];
+      if ((m = s.match(/\/embed\/([^?&#/]+)/))) return m[1];
+    } catch(_) {}
+    return null;
+  }
+
+  function buildSrc(id, auto){
+    const params = new URLSearchParams({
+      rel: 0,
+      playsinline: 1,
+      modestbranding: 1,
+      autoplay: auto ? 1 : 0
+    });
+    return 'https://www.youtube.com/embed/' + encodeURIComponent(id) + '?' + params.toString();
+  }
+
+  function load(){
+    const id = extractId(input.value.trim());
+    if(!id){ alert('Could not find a YouTube video ID.'); return; }
+    const src = buildSrc(id, autoplay.checked);
+    player.src = src;
+
+    // persist last
+    try { localStorage.setItem('yt_last', input.value.trim()); } catch(_){}
+    // also reflect the id in query string so you can bookmark this page with ?id=XXXX
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('id', id);
+      history.replaceState({}, '', url);
+    } catch(_){}
+  }
+
+  // UI hooks
+  $('#loadBtn').addEventListener('click', load);
+  input.addEventListener('keydown', e => { if(e.key === 'Enter') load(); });
+  sizeSel.addEventListener('change', () => {
+    document.documentElement.style.setProperty('--player-width', sizeSel.value);
+  });
+  openTab.addEventListener('click', () => {
+    const id = extractId(input.value.trim());
+    if(!id){ alert('No video loaded. Paste a URL first.'); return; }
+    const href = buildSrc(id, autoplay.checked);
+    // simulate a link click (works well in Firefox)
+    const a = document.createElement('a');
+    a.href = href; a.target = '_blank'; a.rel='noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  // Initialize from ?id=... or last used
+  (function init(){
+    const url = new URL(location.href);
+    const qid = url.searchParams.get('id');
+    const last = (()=>{ try { return localStorage.getItem('yt_last'); } catch(_) { return null; }})();
+    if(qid){ input.value = qid; load(); }
+    else if(last){ input.value = last; }
+  })();
+})();
+</script>
+</body>
+</html>
